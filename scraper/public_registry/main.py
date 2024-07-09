@@ -53,7 +53,6 @@ async def main():
     search_scraper = SearchScraper(queue, stop_flag)
 
     try:
-        
         rate_limiter = RateLimiter(rate=2, per=1.0, burst=1)
 
         logger.info("Starting search scraper...")
@@ -86,9 +85,10 @@ async def main():
 
         logger.info(f"Scraping completed. Scraped info for {len(registrant_infos)} registrants")
         save_results(registrant_infos)
+        
+        return registrant_infos
     finally:
         await search_scraper.close()
-
 
 def save_results(registrant_infos: List[RegistrantInfo]):
     filename = 'registrant_results.json'
@@ -97,13 +97,15 @@ def save_results(registrant_infos: List[RegistrantInfo]):
     logger.info(f"Results saved to {filename}")
 
 async def run_scraper():
+    results = []
     try:
-        await main()
+        results = await main()  # Assuming main() returns the scraped results
     except KeyboardInterrupt:
         logger.info("KeyboardInterrupt received, stopping scraper...")
     finally:
         logger.info("Shutting down...")
         cleanup_chrome_processes()
+    return results
 
 
 def cleanup_chrome_processes():

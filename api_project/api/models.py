@@ -11,7 +11,9 @@ class ScraperResult(models.Model):
     languages_of_care = models.TextField(null=True, blank=True)
     registration_status = models.CharField(max_length=255, null=True, blank=True)
     areas_of_practice = models.TextField(null=True, blank=True)
-    # Add more fields as needed
+    registrant_history = models.JSONField(null=True, blank=True)  # Add this field
+    practice_locations = models.JSONField(null=True, blank=True)  # Add this field
+    professional_corporation = models.JSONField(null=True, blank=True)  # Add this field
 
     def __str__(self):
         return f"{self.name} ({self.userid})"

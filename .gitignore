@@ -163,3 +163,4 @@ cython_debug/
 scraper/public_registry/registrant_results.json
 api_project/dump.rdb
 dump.rdb
+api_project/registrant_results.json
