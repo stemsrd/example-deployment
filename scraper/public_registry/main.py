@@ -4,9 +4,9 @@ import sys
 import signal
 import psutil
 from typing import List
-from search_scraper import SearchScraper
-from registrant_scraper import RegistrantInfoScraper, RegistrantInfo
-from rate_limiter import RateLimiter
+from .search_scraper import SearchScraper
+from .registrant_scraper import RegistrantInfoScraper, RegistrantInfo
+from .rate_limiter import RateLimiter
 import json
 from dataclasses import asdict
 
@@ -96,19 +96,11 @@ def save_results(registrant_infos: List[RegistrantInfo]):
         json.dump([asdict(info) for info in registrant_infos], f, ensure_ascii=False, indent=4)
     logger.info(f"Results saved to {filename}")
 
-def run_scraper():
-    if sys.platform == 'win32':
-        signal.signal(signal.SIGINT, signal_handler)
-        signal.signal(signal.SIGTERM, signal_handler)
-    else:
-        loop = asyncio.get_event_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, signal_handler, sig, None)
-    
+async def run_scraper():
     try:
-        asyncio.run(main())
+        await main()
     except KeyboardInterrupt:
-        pass
+        logger.info("KeyboardInterrupt received, stopping scraper...")
     finally:
         logger.info("Shutting down...")
         cleanup_chrome_processes()
@@ -122,5 +114,17 @@ def cleanup_chrome_processes():
             except psutil.NoSuchProcess:
                 pass
 
+
+def run_scraper_sync():
+    if sys.platform == 'win32':
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+    else:
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.add_signal_handler(sig, signal_handler, sig, None)
+    
+    asyncio.run(run_scraper())
+
 if __name__ == "__main__":
-    run_scraper()
+    run_scraper_sync()
