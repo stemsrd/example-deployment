@@ -43,7 +43,12 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'api',
+    'django_celery_results',
 ]
+
+# Celery
+CELERY_BROKER_URL = 'redis://localhost:6379'
+CELERY_RESULT_BACKEND = 'django-db'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
