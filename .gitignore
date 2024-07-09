@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 scraper/public_registry/registrant_results.json
 api_project/dump.rdb
+dump.rdb
