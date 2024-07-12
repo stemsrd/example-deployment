@@ -35,58 +35,74 @@ jobs:
         # Create deployment script
         cat << 'EOF' > deploy.sh
         #!/bin/bash
+        set -e  # Exit immediately if a command exits with a non-zero status.
+
+        # Ensure Python3 and pip are installed
+        sudo yum update -y
+        sudo yum install -y python3 python3-pip
+
+        # Install Gunicorn
+        pip3 install --user gunicorn
+
         # Ensure Git is configured
         git config --global user.email "deployment@example.com"
         git config --global user.name "Deployment Script"
 
         # Clone the repository if it doesnt exist, otherwise pull latest changes
-        if [ ! -d "/home/ec2-user/django-scraper" ]; then
-          git clone https://github.com/stemsrd/example-deployment.git /home/ec2-user/django-scraper
+        if [ ! -d "/home/ssm-user/django-scraper" ]; then
+          git clone https://github.com/stemsrd/example-deployment.git /home/ssm-user/django-scraper
         else
-          cd /home/ec2-user/django-scraper
+          cd /home/ssm-user/django-scraper
           git pull origin main
         fi
 
-        cd /home/ec2-user/django-scraper
-        pip3 install -r requirements.txt
+        cd /home/ssm-user/django-scraper
+        pip3 install --user -r requirements.txt
         python3 manage.py migrate
         python3 manage.py collectstatic --noinput
 
         # Create the systemd service file
-        echo '[Unit]
+        cat << EOT | sudo tee /etc/systemd/system/django_scraper.service > /dev/null
+        [Unit]
         Description=Django Scraper Gunicorn daemon
         After=network.target
 
         [Service]
-        User=ec2-user
-        Group=ec2-user
-        WorkingDirectory=/home/ec2-user/django-scraper
-        ExecStart=/usr/local/bin/gunicorn --workers 3 --bind unix:/home/ec2-user/django-scraper/django_scraper.sock django_scraper.wsgi:application
+        User=ssm-user
+        Group=ssm-user
+        WorkingDirectory=/home/ssm-user/django-scraper
+        ExecStart=/home/ssm-user/.local/bin/gunicorn --workers 3 --bind unix:/home/ssm-user/django-scraper/django_scraper.sock django_scraper.wsgi:application
 
         [Install]
-        WantedBy=multi-user.target' | sudo tee /etc/systemd/system/django_scraper.service > /dev/null
+        WantedBy=multi-user.target
+        EOT
 
         sudo systemctl daemon-reload
         sudo systemctl enable django_scraper
-        sudo systemctl start django_scraper
+        sudo systemctl restart django_scraper
 
         # Nginx configuration
-        echo "server {
+        cat << EOT | sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null
+        server {
             listen 80;
             server_name _;
 
             location = /favicon.ico { access_log off; log_not_found off; }
             location /static/ {
-                root /home/ec2-user/django-scraper;
+                root /home/ssm-user/django-scraper;
             }
 
             location / {
                 include proxy_params;
-                proxy_pass http://unix:/home/ec2-user/django-scraper/django_scraper.sock;
+                proxy_pass http://unix:/home/ssm-user/django-scraper/django_scraper.sock;
             }
-        }" | sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null
+        }
+        EOT
 
         sudo nginx -t && sudo systemctl restart nginx
+
+        # Check the status of the Django service
+        sudo systemctl status django_scraper
         EOF
 
         # Execute deployment script on the EC2 instance
