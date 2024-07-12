@@ -7,9 +7,22 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run tests
+      run: |
+        python manage.py test
 
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v1
@@ -18,141 +31,23 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-south-2
 
-    - name: Install AWS CLI
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y awscli
-
-    - name: Install Session Manager plugin
-      run: |
-        curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
-        sudo dpkg -i session-manager-plugin.deb
-
     - name: Deploy to EC2
+      env:
+        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.EC2_HOST }}
+        USER: ec2-user
       run: |
-        INSTANCE_ID=$(aws ec2 describe-instances \
-          --filters "Name=tag:Name,Values=ExampleDeploymentCdkStack/DjangoScraperInstance" "Name=instance-state-name,Values=running" \
-          --query "Reservations[].Instances[].InstanceId" \
-          --output text)
-
-        if [ -z "$INSTANCE_ID" ]; then
-          echo "No running instance found. Exiting."
-          exit 1
-        fi
-
-        echo "Deploying to instance: $INSTANCE_ID"
-
-        # Create deployment script
-        cat << 'EOF' > deploy.sh
-        #!/bin/bash
-        set -e  # Exit immediately if a command exits with a non-zero status.
-
-        # Function to log messages
-        log_message() {
-          echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | sudo tee -a /var/log/django-deployment.log
-        }
-
-        log_message "Starting deployment script"
-
-        # Update system and install Python3 and pip
-        log_message "Updating system and installing Python3 and pip"
-        sudo yum update -y
-        sudo yum install -y python3 python3-pip
-
-        # Install Gunicorn for the current user
-        log_message "Installing Gunicorn"
-        pip3 install --user gunicorn
-
-        # Ensure Git is configured
-        log_message "Configuring Git"
-        git config --global user.email "deployment@example.com"
-        git config --global user.name "Deployment Script"
-
-        # Set the correct home directory
-        HOME_DIR="/home/$(whoami)"
-        log_message "Home directory set to: $HOME_DIR"
-
-        # Clone or update repository
-        log_message "Cloning or updating repository"
-        if [ ! -d "$HOME_DIR/django-scraper" ]; then
-          git clone https://github.com/stemsrd/example-deployment.git $HOME_DIR/django-scraper
-        else
-          cd $HOME_DIR/django-scraper
-          git pull origin main
-        fi
-
-        cd $HOME_DIR/django-scraper
-        log_message "Installing Python dependencies"
-        pip3 install --user -r requirements.txt
-        log_message "Running database migrations"
-        python3 manage.py migrate
-        log_message "Collecting static files"
-        python3 manage.py collectstatic --noinput
-
-        # Create the systemd service file
-        log_message "Creating systemd service file"
-        sudo tee /etc/systemd/system/django_scraper.service > /dev/null << EOT
-        [Unit]
-        Description=Django Scraper Gunicorn daemon
-        After=network.target
-
-        [Service]
-        User=$(whoami)
-        Group=$(whoami)
-        WorkingDirectory=$HOME_DIR/django-scraper
-        ExecStart=$HOME_DIR/.local/bin/gunicorn --workers 3 --bind unix:$HOME_DIR/django-scraper/django_scraper.sock django_scraper.wsgi:application
-
-        [Install]
-        WantedBy=multi-user.target
-        EOT
-
-        log_message "Reloading systemd and starting django_scraper service"
-        sudo systemctl daemon-reload
-        sudo systemctl enable django_scraper
-        sudo systemctl restart django_scraper
-
-        # Nginx configuration
-        log_message "Configuring Nginx"
-        sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null << EOT
-        server {
-            listen 80;
-            server_name _;
-
-            location = /favicon.ico { access_log off; log_not_found off; }
-            location /static/ {
-                root $HOME_DIR/django-scraper;
-            }
-
-            location / {
-                include proxy_params;
-                proxy_pass http://unix:$HOME_DIR/django-scraper/django_scraper.sock;
-            }
-        }
-        EOT
-
-        log_message "Testing and restarting Nginx"
-        sudo nginx -t && sudo systemctl restart nginx
-
-        # Check the status of the Django service
-        log_message "Checking status of django_scraper service"
-        sudo systemctl status django_scraper
-
-        log_message "Deployment script completed"
-        EOF
-
-        # Execute deployment script on the EC2 instance
-        aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters '{"commands":["#!/bin/bash", "'"$(sed 's/"/\\"/g' deploy.sh | sed -z 's/\n/\\n/g')"'"]}' \
-          --output text
-
-        # Wait for the command to complete
-        sleep 60
-
-        # Retrieve the log file
-        aws ssm send-command \
-          --instance-ids "$INSTANCE_ID" \
-          --document-name "AWS-RunShellScript" \
-          --parameters '{"commands":["cat /var/log/django-deployment.log"]}' \
-          --output text
+        echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
+        scp -i private_key -o StrictHostKeyChecking=no -r ./* ${USER}@${HOST}:/home/ec2-user/app
+        ssh -i private_key -o StrictHostKeyChecking=no ${USER}@${HOST} '
+          cd /home/ec2-user/app
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          python manage.py collectstatic --noinput
+          python manage.py migrate
+          sudo cp uvicorn.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable uvicorn
+          sudo systemctl restart uvicorn
+        '
