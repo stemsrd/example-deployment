@@ -40,6 +40,16 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-south-2
 
+    - name: Add Host Key
+      run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+
+    - name: Check Private Key
+      run: |
+        echo "First few characters of private key:"
+        echo "$PRIVATE_KEY" | head -n 1
+        echo "$PRIVATE_KEY" | tail -n 1
+
     - name: Deploy to EC2
       env:
         PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
@@ -47,8 +57,8 @@ jobs:
         USER: ec2-user
       run: |
         echo "$PRIVATE_KEY" > private_key && chmod 600 private_key
-        scp -i private_key -o StrictHostKeyChecking=no -r ./* ${USER}@${HOST}:/home/ec2-user/app
-        ssh -i private_key -o StrictHostKeyChecking=no ${USER}@${HOST} '
+        scp -vvv -i private_key -o StrictHostKeyChecking=no -r ./* ${USER}@${HOST}:/home/ec2-user/app
+        ssh -vvv -i private_key -o StrictHostKeyChecking=no ${USER}@${HOST} '
           cd /home/ec2-user/app
           python3 -m venv venv
           source venv/bin/activate
