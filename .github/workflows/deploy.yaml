@@ -93,5 +93,5 @@ jobs:
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --parameters '{"commands":["#!/bin/bash", "'"$(sed 's/"/\\"/g' deploy.sh)"'"]}' \
+          --parameters '{"commands":["#!/bin/bash", "'"$(sed 's/"/\\"/g' deploy.sh | sed -z 's/\n/\\n/g')"'"]}' \
           --output text
