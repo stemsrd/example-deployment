@@ -41,27 +41,39 @@ jobs:
         fi
 
         echo "Deploying to instance: $INSTANCE_ID"
-        
+
         # Create deployment script
         cat << 'EOF' > deploy.sh
         #!/bin/bash
         set -e  # Exit immediately if a command exits with a non-zero status.
 
+        # Function to log messages
+        log_message() {
+          echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | sudo tee -a /var/log/django-deployment.log
+        }
+
+        log_message "Starting deployment script"
+
         # Update system and install Python3 and pip
+        log_message "Updating system and installing Python3 and pip"
         sudo yum update -y
         sudo yum install -y python3 python3-pip
 
         # Install Gunicorn for the current user
+        log_message "Installing Gunicorn"
         pip3 install --user gunicorn
 
         # Ensure Git is configured
+        log_message "Configuring Git"
         git config --global user.email "deployment@example.com"
         git config --global user.name "Deployment Script"
 
         # Set the correct home directory
         HOME_DIR="/home/$(whoami)"
+        log_message "Home directory set to: $HOME_DIR"
 
-        # Clone the repository if it doesnt exist, otherwise pull latest changes
+        # Clone or update repository
+        log_message "Cloning or updating repository"
         if [ ! -d "$HOME_DIR/django-scraper" ]; then
           git clone https://github.com/stemsrd/example-deployment.git $HOME_DIR/django-scraper
         else
@@ -70,52 +82,62 @@ jobs:
         fi
 
         cd $HOME_DIR/django-scraper
+        log_message "Installing Python dependencies"
         pip3 install --user -r requirements.txt
+        log_message "Running database migrations"
         python3 manage.py migrate
+        log_message "Collecting static files"
         python3 manage.py collectstatic --noinput
 
         # Create the systemd service file
+        log_message "Creating systemd service file"
         sudo tee /etc/systemd/system/django_scraper.service > /dev/null << EOT
-        [Unit]
-        Description=Django Scraper Gunicorn daemon
-        After=network.target
+    [Unit]
+    Description=Django Scraper Gunicorn daemon
+    After=network.target
 
-        [Service]
-        User=$(whoami)
-        Group=$(whoami)
-        WorkingDirectory=$HOME_DIR/django-scraper
-        ExecStart=$HOME_DIR/.local/bin/gunicorn --workers 3 --bind unix:$HOME_DIR/django-scraper/django_scraper.sock django_scraper.wsgi:application
+    [Service]
+    User=$(whoami)
+    Group=$(whoami)
+    WorkingDirectory=$HOME_DIR/django-scraper
+    ExecStart=$HOME_DIR/.local/bin/gunicorn --workers 3 --bind unix:$HOME_DIR/django-scraper/django_scraper.sock django_scraper.wsgi:application
 
-        [Install]
-        WantedBy=multi-user.target
-        EOT
+    [Install]
+    WantedBy=multi-user.target
+    EOT
 
+        log_message "Reloading systemd and starting django_scraper service"
         sudo systemctl daemon-reload
         sudo systemctl enable django_scraper
         sudo systemctl restart django_scraper
 
         # Nginx configuration
+        log_message "Configuring Nginx"
         sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null << EOT
-        server {
-            listen 80;
-            server_name _;
+    server {
+        listen 80;
+        server_name _;
 
-            location = /favicon.ico { access_log off; log_not_found off; }
-            location /static/ {
-                root $HOME_DIR/django-scraper;
-            }
-
-            location / {
-                include proxy_params;
-                proxy_pass http://unix:$HOME_DIR/django-scraper/django_scraper.sock;
-            }
+        location = /favicon.ico { access_log off; log_not_found off; }
+        location /static/ {
+            root $HOME_DIR/django-scraper;
         }
-        EOT
 
+        location / {
+            include proxy_params;
+            proxy_pass http://unix:$HOME_DIR/django-scraper/django_scraper.sock;
+        }
+    }
+    EOT
+
+        log_message "Testing and restarting Nginx"
         sudo nginx -t && sudo systemctl restart nginx
 
         # Check the status of the Django service
+        log_message "Checking status of django_scraper service"
         sudo systemctl status django_scraper
+
+        log_message "Deployment script completed"
         EOF
 
         # Execute deployment script on the EC2 instance
@@ -123,4 +145,14 @@ jobs:
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
           --parameters '{"commands":["#!/bin/bash", "'"$(sed 's/"/\\"/g' deploy.sh | sed -z 's/\n/\\n/g')"'"]}' \
+          --output text
+
+        # Wait for the command to complete
+        sleep 60
+
+        # Retrieve the log file
+        aws ssm send-command \
+          --instance-ids "$INSTANCE_ID" \
+          --document-name "AWS-RunShellScript" \
+          --parameters '{"commands":["cat /var/log/django-deployment.log"]}' \
           --output text
