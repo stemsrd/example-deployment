@@ -16,7 +16,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: eu-south-2  # Make sure this matches your EC2 instance's region
+        aws-region: eu-south-2
 
     - name: Install AWS CLI
       run: |
@@ -30,7 +30,17 @@ jobs:
 
     - name: Deploy to EC2
       run: |
-        INSTANCE_ID=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=ExampleDeploymentCdkStack/DjangoScraperInstance" --query "Reservations[].Instances[].InstanceId" --output text)
+        INSTANCE_ID=$(aws ec2 describe-instances \
+          --filters "Name=tag:Name,Values=ExampleDeploymentCdkStack/DjangoScraperInstance" "Name=instance-state-name,Values=running" \
+          --query "Reservations[].Instances[].InstanceId" \
+          --output text)
+
+        if [ -z "$INSTANCE_ID" ]; then
+          echo "No running instance found. Exiting."
+          exit 1
+        fi
+
+        echo "Deploying to instance: $INSTANCE_ID"
         
         # Create deployment script
         cat << 'EOF' > deploy.sh
