@@ -37,41 +37,44 @@ jobs:
         #!/bin/bash
         set -e  # Exit immediately if a command exits with a non-zero status.
 
-        # Ensure Python3 and pip are installed
+        # Update system and install Python3 and pip
         sudo yum update -y
         sudo yum install -y python3 python3-pip
 
-        # Install Gunicorn
+        # Install Gunicorn for the current user
         pip3 install --user gunicorn
 
         # Ensure Git is configured
         git config --global user.email "deployment@example.com"
         git config --global user.name "Deployment Script"
 
+        # Set the correct home directory
+        HOME_DIR="/home/$(whoami)"
+
         # Clone the repository if it doesnt exist, otherwise pull latest changes
-        if [ ! -d "/home/ssm-user/django-scraper" ]; then
-          git clone https://github.com/stemsrd/example-deployment.git /home/ssm-user/django-scraper
+        if [ ! -d "$HOME_DIR/django-scraper" ]; then
+          git clone https://github.com/stemsrd/example-deployment.git $HOME_DIR/django-scraper
         else
-          cd /home/ssm-user/django-scraper
+          cd $HOME_DIR/django-scraper
           git pull origin main
         fi
 
-        cd /home/ssm-user/django-scraper
+        cd $HOME_DIR/django-scraper
         pip3 install --user -r requirements.txt
         python3 manage.py migrate
         python3 manage.py collectstatic --noinput
 
         # Create the systemd service file
-        cat << EOT | sudo tee /etc/systemd/system/django_scraper.service > /dev/null
+        sudo tee /etc/systemd/system/django_scraper.service > /dev/null << EOT
         [Unit]
         Description=Django Scraper Gunicorn daemon
         After=network.target
 
         [Service]
-        User=ssm-user
-        Group=ssm-user
-        WorkingDirectory=/home/ssm-user/django-scraper
-        ExecStart=/home/ssm-user/.local/bin/gunicorn --workers 3 --bind unix:/home/ssm-user/django-scraper/django_scraper.sock django_scraper.wsgi:application
+        User=$(whoami)
+        Group=$(whoami)
+        WorkingDirectory=$HOME_DIR/django-scraper
+        ExecStart=$HOME_DIR/.local/bin/gunicorn --workers 3 --bind unix:$HOME_DIR/django-scraper/django_scraper.sock django_scraper.wsgi:application
 
         [Install]
         WantedBy=multi-user.target
@@ -82,19 +85,19 @@ jobs:
         sudo systemctl restart django_scraper
 
         # Nginx configuration
-        cat << EOT | sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null
+        sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null << EOT
         server {
             listen 80;
             server_name _;
 
             location = /favicon.ico { access_log off; log_not_found off; }
             location /static/ {
-                root /home/ssm-user/django-scraper;
+                root $HOME_DIR/django-scraper;
             }
 
             location / {
                 include proxy_params;
-                proxy_pass http://unix:/home/ssm-user/django-scraper/django_scraper.sock;
+                proxy_pass http://unix:$HOME_DIR/django-scraper/django_scraper.sock;
             }
         }
         EOT
