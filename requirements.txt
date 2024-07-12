@@ -1,0 +1,9 @@
+django
+djangorestframework
+uvicorn[standard]
+celery
+webdriver_manager
+selenium
+psutil
+requests
+bs4
