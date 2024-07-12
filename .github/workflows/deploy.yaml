@@ -92,19 +92,19 @@ jobs:
         # Create the systemd service file
         log_message "Creating systemd service file"
         sudo tee /etc/systemd/system/django_scraper.service > /dev/null << EOT
-    [Unit]
-    Description=Django Scraper Gunicorn daemon
-    After=network.target
+        [Unit]
+        Description=Django Scraper Gunicorn daemon
+        After=network.target
 
-    [Service]
-    User=$(whoami)
-    Group=$(whoami)
-    WorkingDirectory=$HOME_DIR/django-scraper
-    ExecStart=$HOME_DIR/.local/bin/gunicorn --workers 3 --bind unix:$HOME_DIR/django-scraper/django_scraper.sock django_scraper.wsgi:application
+        [Service]
+        User=$(whoami)
+        Group=$(whoami)
+        WorkingDirectory=$HOME_DIR/django-scraper
+        ExecStart=$HOME_DIR/.local/bin/gunicorn --workers 3 --bind unix:$HOME_DIR/django-scraper/django_scraper.sock django_scraper.wsgi:application
 
-    [Install]
-    WantedBy=multi-user.target
-    EOT
+        [Install]
+        WantedBy=multi-user.target
+        EOT
 
         log_message "Reloading systemd and starting django_scraper service"
         sudo systemctl daemon-reload
@@ -114,21 +114,21 @@ jobs:
         # Nginx configuration
         log_message "Configuring Nginx"
         sudo tee /etc/nginx/conf.d/django_scraper.conf > /dev/null << EOT
-    server {
-        listen 80;
-        server_name _;
+        server {
+            listen 80;
+            server_name _;
 
-        location = /favicon.ico { access_log off; log_not_found off; }
-        location /static/ {
-            root $HOME_DIR/django-scraper;
-        }
+            location = /favicon.ico { access_log off; log_not_found off; }
+            location /static/ {
+                root $HOME_DIR/django-scraper;
+            }
 
-        location / {
-            include proxy_params;
-            proxy_pass http://unix:$HOME_DIR/django-scraper/django_scraper.sock;
+            location / {
+                include proxy_params;
+                proxy_pass http://unix:$HOME_DIR/django-scraper/django_scraper.sock;
+            }
         }
-    }
-    EOT
+        EOT
 
         log_message "Testing and restarting Nginx"
         sudo nginx -t && sudo systemctl restart nginx
