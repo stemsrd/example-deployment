@@ -161,3 +161,6 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 scraper/public_registry/registrant_results.json
+api_project/dump.rdb
+dump.rdb
+api_project/registrant_results.json
