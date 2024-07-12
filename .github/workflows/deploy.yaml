@@ -93,4 +93,5 @@ jobs:
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
-          --parameters '{"commands":["bash -c \"$(cat << 'EOT'\n'"$(cat deploy.sh)"'\nEOT\n)\""]}'
+          --parameters '{"commands":["#!/bin/bash", "'"$(sed 's/"/\\"/g' deploy.sh)"'"]}' \
+          --output text
