@@ -34,6 +34,7 @@ jobs:
         # Run deployment commands
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
           set -e
+          mkdir /home/ec2-user/app
           cd /home/ec2-user/app
           
           echo "Current Python versions:"
