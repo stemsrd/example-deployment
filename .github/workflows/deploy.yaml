@@ -25,6 +25,7 @@ jobs:
 
     - name: Run tests
       run: |
+        cd api_project
         python manage.py test
 
     - name: Setup SSH
