@@ -1,4 +1,4 @@
-name: Execute SSH Commands on EC2
+name: Deploy to EC2
 
 on:
   push:
@@ -6,12 +6,27 @@ on:
       - main
 
 jobs:
-  ssh:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run tests
+      run: |
+        cd api_project
+        python manage.py test
 
     - name: Setup SSH
       run: |
@@ -24,6 +39,20 @@ jobs:
         eval "$(ssh-agent -s)"
         ssh-add ~/.ssh/id_rsa
 
-    - name: Execute remote commands
+    - name: Deploy to EC2
+      env:
+        EC2_HOST: ${{ secrets.EC2_HOST }}
       run: |
-        ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} "hostname"
+        scp -o StrictHostKeyChecking=no -r ./* ec2-user@${EC2_HOST}:/home/ec2-user/app
+        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
+          cd /home/ec2-user/app
+          python3 -m venv venv
+          source venv/bin/activate
+          pip install -r requirements.txt
+          python manage.py collectstatic --noinput
+          python manage.py migrate
+          sudo cp uvicorn.service /etc/systemd/system/
+          sudo systemctl daemon-reload
+          sudo systemctl enable uvicorn
+          sudo systemctl restart uvicorn
+        '
