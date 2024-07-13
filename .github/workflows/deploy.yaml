@@ -26,4 +26,4 @@ jobs:
 
     - name: Execute remote commands
       run: |
-        ssh -o StrictHostKeyChecking=no ec2-user@18.100.126.11 "hostname"
+        ssh -o StrictHostKeyChecking=no ec2-user@${{ secrets.EC2_HOST }} "hostname"
