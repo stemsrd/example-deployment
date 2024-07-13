@@ -30,16 +30,22 @@ jobs:
       run: |
         # Copy files to the EC2 instance
         scp -o StrictHostKeyChecking=no -r ./* ec2-user@${EC2_HOST}:/home/ec2-user/app
-        
+
         # Run deployment commands
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
           set -e
           cd /home/ec2-user/app
           
-          # Update Python to 3.8
+          echo "Current Python version:"
+          python3 --version
+          
+          # Update Python to 3.8 (if not already set)
           sudo amazon-linux-extras enable python3.8
           sudo yum install -y python3.8
-          sudo alternatives --set python3 /usr/bin/python3.8
+          sudo alternatives --set python3 /usr/bin/python3.8 || echo "Failed to set Python 3.8 as default, continuing anyway"
+          
+          echo "Python version after update:"
+          python3 --version
           
           # Create and activate virtual environment
           python3 -m venv venv
