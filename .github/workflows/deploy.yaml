@@ -43,11 +43,16 @@ jobs:
     - name: Check Host Key
       run: ssh-keyscan -H ${{ secrets.EC2_HOST }}
 
-    - name: Check Private Key
+    - name: Check secrets
+      env:
+        PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.EC2_HOST }}
+        USER: ec2-user
       run: |
         echo "First few characters of private key:"
-        echo "$PRIVATE_KEY" | head -n 1
-        echo "$PRIVATE_KEY" | tail -n 1
+        echo "$PRIVATE_KEY"
+        echo "Host:" 
+        echo "$HOST"
 
     - name: Deploy to EC2
       env:
