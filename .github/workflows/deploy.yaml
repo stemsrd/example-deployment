@@ -34,7 +34,11 @@ jobs:
         # Run deployment commands
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
           set -e
-          mkdir /home/ec2-user/app
+          # Create app directoy if it doesn't exist
+          if [ ! -d "$DIRECTORY" ]; then
+            mkdir /home/ec2-user/app
+          fi
+
           cd /home/ec2-user/app
           
           echo "Current Python versions:"
