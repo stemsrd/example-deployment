@@ -28,17 +28,19 @@ jobs:
       env:
         EC2_HOST: ${{ secrets.EC2_HOST }}
       run: |
+        # Create app directory if it doesn't exist
+        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
+          if [ ! -d "/home/ec2-user/app" ]; then
+            mkdir /home/ec2-user/app
+          fi'
+
         # Copy files to the EC2 instance
         scp -o StrictHostKeyChecking=no -r ./* ec2-user@${EC2_HOST}:/home/ec2-user/app
 
         # Run deployment commands
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
           set -e
-          # Create app directoy if it doesn't exist
-          if [ ! -d "$DIRECTORY" ]; then
-            mkdir /home/ec2-user/app
-          fi
-
+          
           cd /home/ec2-user/app
           
           echo "Current Python versions:"
