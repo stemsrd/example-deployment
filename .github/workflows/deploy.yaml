@@ -36,20 +36,17 @@ jobs:
           set -e
           cd /home/ec2-user/app
           
-          echo "Current Python version:"
+          echo "Current Python versions:"
+          python --version
           python3 --version
+          python3.8 --version
           
-          # Update Python to 3.8 (if not already set)
-          sudo amazon-linux-extras enable python3.8
-          sudo yum install -y python3.8
-          sudo alternatives --set python3 /usr/bin/python3.8 || echo "Failed to set Python 3.8 as default, continuing anyway"
-          
-          echo "Python version after update:"
-          python3 --version
-          
-          # Create and activate virtual environment
-          python3 -m venv venv
+          # Create and activate virtual environment using Python 3.8 explicitly
+          /usr/bin/python3.8 -m venv venv
           source venv/bin/activate
+          
+          echo "Python version in virtual environment:"
+          python --version
           
           # Upgrade pip and install requirements
           pip install --upgrade pip
