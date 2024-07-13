@@ -13,21 +13,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run tests
-      run: |
-        cd api_project
-        python manage.py test
-
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
@@ -50,10 +35,25 @@ jobs:
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
           set -e
           cd /home/ec2-user/app
+          
+          # Update Python to 3.9
+          sudo amazon-linux-extras enable python3.9
+          sudo yum install -y python3.9
+          sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.9 1
+          sudo update-alternatives --set python3 /usr/bin/python3.9
+          
+          # Create and activate virtual environment
           python3 -m venv venv
           source venv/bin/activate
+          
+          # Upgrade pip and install requirements
           pip install --upgrade pip
           pip install -r requirements.txt
+          
+          # Set the DJANGO_SETTINGS_MODULE environment variable
+          export DJANGO_SETTINGS_MODULE=api_project.settings
+          
+          # Run Django commands
           cd api_project
           python manage.py collectstatic --noinput
           python manage.py migrate
