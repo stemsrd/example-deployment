@@ -25,7 +25,6 @@ jobs:
 
     - name: Run tests
       run: |
-        cd api_project
         python manage.py test
 
     - name: Setup SSH
@@ -43,22 +42,23 @@ jobs:
       env:
         EC2_HOST: ${{ secrets.EC2_HOST }}
       run: |
-        # Create the app directory if it doesn't exist
-        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} 'mkdir -p /home/ec2-user/app'
-        
         # Copy files to the EC2 instance
         scp -o StrictHostKeyChecking=no -r ./* ec2-user@${EC2_HOST}:/home/ec2-user/app
         
         # Run deployment commands
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
+          set -e
           cd /home/ec2-user/app
           python3 -m venv venv
           source venv/bin/activate
+          pip install --upgrade pip
           pip install -r requirements.txt
+          cd api_project
           python manage.py collectstatic --noinput
           python manage.py migrate
-          sudo cp uvicorn.service /etc/systemd/system/
-          sudo systemctl daemon-reload
-          sudo systemctl enable uvicorn
-          sudo systemctl restart uvicorn
-        '
+          
+          # Restart the uvicorn service
+          sudo systemctl restart uvicorn.service
+          
+          echo "Deployment completed successfully"
+        ' || { echo "Deployment failed"; exit 1; }
