@@ -43,6 +43,10 @@ jobs:
           
           cd /home/ec2-user/app
           
+          # Update Python to 3.8
+          sudo amazon-linux-extras enable python3.8
+          sudo yum install -y python3.8
+
           echo "Current Python versions:"
           python --version
           python3 --version
