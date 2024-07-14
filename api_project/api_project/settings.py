@@ -112,16 +112,14 @@ DATABASES = {
     }
 }
 
-# Use custom database wrapper
-DATABASES['default']['OPTIONS'] = {'threadlocals': True}
-DATABASES['default']['ENGINE'] = 'django.db.backends.sqlite3'
-
 # Override the database backend
 from django.db.backends.sqlite3 import base
 base.DatabaseWrapper = CustomDatabaseWrapper
 
 # Silence JSONField warnings
 SILENCED_SYSTEM_CHECKS = ['models.JSONField', 'fields.JSONField']
+
+
 
 
 # Password validation
