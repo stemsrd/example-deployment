@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 from pathlib import Path
 import sys
 import os
+import sqlite3
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -92,11 +93,12 @@ DATABASES = {
     }
 }
 
-# Disable JSONField for older SQLite versions
-if 'sqlite3' in sys.modules:
-    from sqlite3.dbapi2 import sqlite_version_info
-    if sqlite_version_info < (3, 9, 0):
-        SILENCED_SYSTEM_CHECKS = ['models.JSONField']
+# Disable JSONField and other SQLite-specific features for older versions
+if sqlite3.sqlite_version_info < (3, 8, 3):
+    SILENCED_SYSTEM_CHECKS = ['models.JSONField', 'fields.JSONField']
+    DATABASES['default']['OPTIONS'] = {
+        'deterministic': False,
+    }
 
 
 # Password validation

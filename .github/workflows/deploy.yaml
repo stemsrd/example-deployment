@@ -58,16 +58,13 @@ jobs:
           
           echo "Current Python and SQLite versions:"
           python --version
-          python -c "import sqlite3; print(sqlite3.sqlite_version)"
+          python -c "import sqlite3; print(f\"SQLite version: {sqlite3.sqlite_version}\")"
+          python -c "import django; print(f\"Django version: {django.__version__}\")"
 
           
-          # Upgrade pip
+          # Upgrade pip and install requirements
           pip install --upgrade pip
-          
-          # Install urllib3<2.0 before other requirements
           pip install "urllib3<2.0"
-          
-          # Install other requirements
           pip install -r requirements.txt
           
           # Set the DJANGO_SETTINGS_MODULE environment variable
@@ -78,8 +75,8 @@ jobs:
           
           # Run Django commands
           cd api_project
-          python manage.py collectstatic --noinput
-          python manage.py migrate
+          python manage.py collectstatic --noinput -v 2
+          python manage.py migrate -v 2
           
           # Restart the uvicorn service
           sudo systemctl restart uvicorn.service
