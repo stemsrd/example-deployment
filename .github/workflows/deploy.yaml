@@ -65,6 +65,9 @@ jobs:
           
           # Set the DJANGO_SETTINGS_MODULE environment variable
           export DJANGO_SETTINGS_MODULE=api_project.settings
+
+          # Create staticfiles directory
+          mkdir -p api_project/staticfiles
           
           # Run Django commands
           cd api_project
