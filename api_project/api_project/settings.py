@@ -93,12 +93,9 @@ DATABASES = {
     }
 }
 
-# Disable JSONField and other SQLite-specific features for older versions
+# Remove the SQLite-specific options
 if sqlite3.sqlite_version_info < (3, 8, 3):
     SILENCED_SYSTEM_CHECKS = ['models.JSONField', 'fields.JSONField']
-    DATABASES['default']['OPTIONS'] = {
-        'deterministic': False,
-    }
 
 
 # Password validation

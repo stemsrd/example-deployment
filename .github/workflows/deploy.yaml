@@ -40,17 +40,11 @@ jobs:
         # Run deployment commands
         ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
           set -e
-          
           cd /home/ec2-user/app
           
           # Update Python to 3.8
           sudo amazon-linux-extras enable python3.8
           sudo yum install -y python3.8
-
-          echo "Current Python versions:"
-          python --version
-          python3 --version
-          python3.8 --version
           
           # Create and activate virtual environment using Python 3.8 explicitly
           /usr/bin/python3.8 -m venv venv
@@ -73,9 +67,10 @@ jobs:
           # Create staticfiles directory
           mkdir -p api_project/staticfiles
           
-          # Run Django commands
+          # Run Django commands with verbose output
           cd api_project
           python manage.py collectstatic --noinput -v 2
+          python manage.py makemigrations -v 2
           python manage.py migrate -v 2
           
           # Restart the uvicorn service
