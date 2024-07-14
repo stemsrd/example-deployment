@@ -92,6 +92,12 @@ DATABASES = {
     }
 }
 
+# Disable JSONField for older SQLite versions
+if 'sqlite3' in sys.modules:
+    from sqlite3.dbapi2 import sqlite_version_info
+    if sqlite_version_info < (3, 9, 0):
+        SILENCED_SYSTEM_CHECKS = ['models.JSONField']
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
