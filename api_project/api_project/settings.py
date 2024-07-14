@@ -14,6 +14,25 @@ from pathlib import Path
 import sys
 import os
 import sqlite3
+from django.db.backends.sqlite3.base import DatabaseWrapper
+
+
+# Monkey-patch SQLite connection to remove 'deterministic' parameter
+orig_connect = sqlite3.connect
+
+def patched_connect(*args, **kwargs):
+    kwargs.pop('deterministic', None)
+    return orig_connect(*args, **kwargs)
+
+sqlite3.connect = patched_connect
+
+# Override DatabaseWrapper to remove 'deterministic' from connect params
+class CustomDatabaseWrapper(DatabaseWrapper):
+    def get_connection_params(self):
+        conn_params = super().get_connection_params()
+        conn_params.pop('deterministic', None)
+        return conn_params
+    
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -86,16 +105,18 @@ WSGI_APPLICATION = 'api_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
 
-# Remove the SQLite-specific options
-if sqlite3.sqlite_version_info < (3, 8, 3):
-    SILENCED_SYSTEM_CHECKS = ['models.JSONField', 'fields.JSONField']
+
+# Use custom database wrapper
+DATABASES['default']['OPTIONS'] = {'threadlocals': True}
+DATABASES['default']['ENGINE'] = 'django.db.backends.sqlite3'
+
+# Override the database backend
+from django.db.backends.sqlite3 import base
+base.DatabaseWrapper = CustomDatabaseWrapper
+
+# Silence JSONField warnings
+SILENCED_SYSTEM_CHECKS = ['models.JSONField', 'fields.JSONField']
 
 
 # Password validation
