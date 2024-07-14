@@ -59,8 +59,13 @@ jobs:
           echo "Python version in virtual environment:"
           python --version
           
-          # Upgrade pip and install requirements
+          # Upgrade pip
           pip install --upgrade pip
+          
+          # Install urllib3<2.0 before other requirements
+          pip install "urllib3<2.0"
+          
+          # Install other requirements
           pip install -r requirements.txt
           
           # Set the DJANGO_SETTINGS_MODULE environment variable
