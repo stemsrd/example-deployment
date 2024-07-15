@@ -83,6 +83,9 @@ jobs:
           echo "DB_PORT=${{ env.DB_PORT }}" >> .env
           echo "CELERY_BROKER_URL='"'"'$CELERY_BROKER_URL'"'"'" >> .env
           
+          # Set PYTHONPATH
+          export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
+
           # Run Django commands
           cd api_project
           python manage.py collectstatic --noinput
