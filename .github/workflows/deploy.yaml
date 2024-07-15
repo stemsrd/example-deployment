@@ -62,15 +62,12 @@ jobs:
           /usr/bin/python3.8 -m venv venv
           source venv/bin/activate
           
-          sleep 2
           echo "Python version in virtual environment:"
           python --version
 
           # Install dependencies
           pip install --upgrade pip
           pip install -r requirements.txt
-          pip install psycopg2-binary  # PostgreSQL adapter for Python
-
           
           # Create .env file
           echo "DJANGO_SECRET_KEY='"'"'$DJANGO_SECRET_KEY'"'"'" > .env
@@ -85,6 +82,9 @@ jobs:
           
           # Set PYTHONPATH
           export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
+
+          # Create database if it doesn'"'"'t exist
+          PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '"'"'${{ env.DB_NAME }}'"'"'" | grep -q 1 || PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
 
           # Run Django commands
           cd api_project
