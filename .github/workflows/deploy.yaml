@@ -83,8 +83,13 @@ jobs:
           # Set PYTHONPATH
           export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
 
-          # Create database if it doesn'"'"'t exist
-          PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '"'"'${{ env.DB_NAME }}'"'"'" | grep -q 1 || PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
+          # Ensure the correct PostgreSQL client is being used
+          export PATH=/usr/pgsql-14/bin:$PATH
+          which psql
+          psql --version
+
+          # Create database if it doesn't exist
+          PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${{ env.DB_NAME }}'" | grep -q 1 || PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
 
           # Run Django commands
           cd api_project
