@@ -61,6 +61,7 @@ jobs:
         ssh ec2-user@${{ env.EC2_HOST }} '
           set -e
           cd /home/ec2-user/app
+          hostname
           
           # Update Python to 3.8
           sudo amazon-linux-extras enable python3.8
@@ -109,6 +110,8 @@ jobs:
           echo "Pip version: $(pip --version)"
           echo "PostgreSQL client version: $(psql --version)"
           
+          hostname
+          echo $(hostname)
           echo "Testing database connection ..."
           PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d ${{ env.DB_NAME }} -c "SELECT 1;"
 
