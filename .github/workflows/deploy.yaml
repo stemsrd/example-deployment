@@ -20,12 +20,9 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-south-2
 
-    - name: Get EC2 public IP
+    - name: Get EC2 and RDS details
       run: |
         echo "EC2_HOST=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='PublicIP'].OutputValue" --output text)" >> $GITHUB_ENV
-
-    - name: Get RDS details
-      run: |
         echo "DB_ENDPOINT=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBEndpoint'].OutputValue" --output text)" >> $GITHUB_ENV
         echo "DB_PORT=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBPort'].OutputValue" --output text)" >> $GITHUB_ENV
         echo "DB_NAME=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBName'].OutputValue" --output text)" >> $GITHUB_ENV
@@ -44,99 +41,62 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
-    - name: Debug Environment Variables
-      run: |
-        echo "DB_ENDPOINT: ${{ env.DB_ENDPOINT }}"
-        echo "DB_PORT: ${{ env.DB_PORT }}"
-        echo "DB_NAME: ${{ env.DB_NAME }}"
-        echo "DB_USERNAME: ${{ env.DB_USERNAME }}"
-        echo "DB_PASSWORD: ***" # Don't print the actual password
-        
     - name: Deploy to EC2
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
       run: |
-        echo "Hostname: $(hostname)"
         scp -r ./* ec2-user@${{ env.EC2_HOST }}:/home/ec2-user/app
-        echo "Hostname: $(hostname)"
-        ssh ec2-user@${{ env.EC2_HOST }} '
-          echo "Hostname: $(hostname)"
+        ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=30 ec2-user@${{ env.EC2_HOST }} << 'EOF'
           set -e
-          echo "Hostname: $(hostname)"
           cd /home/ec2-user/app
           
-          # Update Python to 3.8
-          echo "Hostname: $(hostname)"
+          echo "Step 1: Setting up Python environment"
           sudo amazon-linux-extras enable python3.8
-          echo "Hostname: $(hostname)"
           sudo yum install -y python3.8
-
-          # Create and activate virtual environment using Python 3.8 explicitly
-          echo "Hostname: $(hostname)"
           /usr/bin/python3.8 -m venv venv
-          echo "Hostname: $(hostname)"
           source venv/bin/activate
           
-          echo "Hostname: $(hostname)"
-          echo "Python version in virtual environment:"
-          echo "Hostname: $(hostname)"
-          python --version
-
-          # Install dependencies
-          echo "Hostname: $(hostname)"
+          echo "Step 2: Installing dependencies"
           pip install --upgrade pip
-          echo "Hostname: $(hostname)"
           pip install -r requirements.txt
           
-          # Create .env file
-          echo "Hostname: $(hostname)"
-          echo "DJANGO_SECRET_KEY='"'"'$DJANGO_SECRET_KEY'"'"'" > .env
-          echo "Hostname: $(hostname)"
-          echo "DEBUG=False" >> .env
-          echo "Hostname: $(hostname)"
-          echo "ALLOWED_HOSTS=${{ env.EC2_HOST }},localhost,127.0.0.1" >> .env
-          echo "Hostname: $(hostname)"
-          echo "DB_NAME='"'"'${{ env.DB_NAME }}'"'"'" >> .env
-          echo "Hostname: $(hostname)"
-          echo "DB_USER='"'"'${{ env.DB_USERNAME }}'"'"'" >> .env
-          echo "Hostname: $(hostname)"
-          echo "DB_PASSWORD='"'"'${{ env.DB_PASSWORD }}'"'"'" >> .env
-          echo "Hostname: $(hostname)"
-          echo "DB_HOST='"'"'${{ env.DB_ENDPOINT }}'"'"'" >> .env
-          echo "Hostname: $(hostname)"
-          echo "DB_PORT=${{ env.DB_PORT }}" >> .env
-          echo "Hostname: $(hostname)"
-          echo "CELERY_BROKER_URL='"'"'$CELERY_BROKER_URL'"'"'" >> .env
+          echo "Step 3: Setting up environment variables"
+          cat << EOT > .env
+          DJANGO_SECRET_KEY='${{ env.DJANGO_SECRET_KEY }}'
+          DEBUG=False
+          ALLOWED_HOSTS=${{ env.EC2_HOST }},localhost,127.0.0.1
+          DB_NAME='${{ env.DB_NAME }}'
+          DB_USER='${{ env.DB_USERNAME }}'
+          DB_PASSWORD='${{ env.DB_PASSWORD }}'
+          DB_HOST='${{ env.DB_ENDPOINT }}'
+          DB_PORT=${{ env.DB_PORT }}
+          CELERY_BROKER_URL='${{ env.CELERY_BROKER_URL }}'
+          EOT
           
-          # Set PYTHONPATH
-          echo "Hostname: $(hostname)"
+          echo "Step 4: Setting PYTHONPATH"
           export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
-
-          # Ensure the correct PostgreSQL client is being used
-          #export PATH=/usr/pgsql-14/bin:$PATH
-          echo "Hostname: $(hostname)"
+          
+          echo "Step 5: Checking PostgreSQL client"
           which psql
-          echo "Hostname: $(hostname)"
           psql --version
-
-          echo "Hostname: $(hostname)"
-          echo "Testing database connection ..."
-          PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d ${{ env.DB_NAME }} -c "SELECT 1;"
-
-          # Create database if it doesn't exist
-          echo "Hostname: $(hostname)"
-          PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${{ env.DB_NAME }}'" | grep -q 1 || PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
-
-          # Run Django commands
-          echo "Hostname: $(hostname)"
+          
+          echo "Step 6: Testing database connection"
+          if ! PGPASSWORD='${{ env.DB_PASSWORD }}' psql -h '${{ env.DB_ENDPOINT }}' -U '${{ env.DB_USERNAME }}' -d '${{ env.DB_NAME }}' -c "SELECT 1;"; then
+            echo "Database connection failed"
+            exit 1
+          fi
+          
+          echo "Step 7: Ensuring database exists"
+          PGPASSWORD='${{ env.DB_PASSWORD }}' psql -h '${{ env.DB_ENDPOINT }}' -U '${{ env.DB_USERNAME }}' -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${{ env.DB_NAME }}'" | grep -q 1 || PGPASSWORD='${{ env.DB_PASSWORD }}' psql -h '${{ env.DB_ENDPOINT }}' -U '${{ env.DB_USERNAME }}' -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
+          
+          echo "Step 8: Running Django commands"
           cd api_project
-          echo "Hostname: $(hostname)"
           python manage.py collectstatic --noinput
-          echo "Hostname: $(hostname)"
           python manage.py migrate
           
-          # Restart the uvicorn service
-          echo "Hostname: $(hostname)"
+          echo "Step 9: Restarting uvicorn service"
           sudo systemctl restart uvicorn.service
-        '
+          
+          echo "Deployment completed successfully"
+        EOF
