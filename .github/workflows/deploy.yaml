@@ -13,68 +13,70 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: eu-south-2  # Replace with your AWS region
+
+    - name: Get EC2 public IP
+      run: |
+        echo "EC2_HOST=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='PublicIP'].OutputValue" --output text)" >> $GITHUB_ENV
+
+    - name: Get RDS details
+      run: |
+        echo "DB_ENDPOINT=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBEndpoint'].OutputValue" --output text)" >> $GITHUB_ENV
+        echo "DB_PORT=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBPort'].OutputValue" --output text)" >> $GITHUB_ENV
+        echo "DB_NAME=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBName'].OutputValue" --output text)" >> $GITHUB_ENV
+        echo "DB_SECRET_NAME=$(aws cloudformation describe-stacks --stack-name ExampleDeploymentCdkStack --query "Stacks[0].Outputs[?OutputKey=='DBSecretName'].OutputValue" --output text)" >> $GITHUB_ENV
+
+    - name: Get DB credentials
+      run: |
+        DB_CREDS=$(aws secretsmanager get-secret-value --secret-id ${{ env.DB_SECRET_NAME }} --query SecretString --output text)
+        echo "DB_USERNAME=$(echo $DB_CREDS | jq -r .username)" >> $GITHUB_ENV
+        echo "DB_PASSWORD=$(echo $DB_CREDS | jq -r .password)" >> $GITHUB_ENV
+
     - name: Setup SSH
       run: |
         mkdir -p ~/.ssh
         echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
-
-    - name: Add SSH key to the agent
-      run: |
-        eval "$(ssh-agent -s)"
-        ssh-add ~/.ssh/id_rsa
+        ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
     - name: Deploy to EC2
       env:
-        EC2_HOST: ${{ secrets.EC2_HOST }}
+        DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+        CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
       run: |
-        # Create app directory if it doesn't exist
-        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
-          if [ ! -d "/home/ec2-user/app" ]; then
-            mkdir /home/ec2-user/app
-          fi'
-
-        # Copy files to the EC2 instance
-        scp -o StrictHostKeyChecking=no -r ./* ec2-user@${EC2_HOST}:/home/ec2-user/app
-
-        # Run deployment commands
-        ssh -o StrictHostKeyChecking=no ec2-user@${EC2_HOST} '
+        scp -r ./* ec2-user@${{ env.EC2_HOST }}:/home/ec2-user/app
+        ssh ec2-user@${{ env.EC2_HOST }} '
           set -e
           cd /home/ec2-user/app
           
-          # Update Python to 3.8
-          sudo amazon-linux-extras enable python3.8
-          sudo yum install -y python3.8
-          
-          # Create and activate virtual environment using Python 3.8 explicitly
-          /usr/bin/python3.8 -m venv venv
+          # Create and activate virtual environment
+          python3 -m venv venv
           source venv/bin/activate
           
-          echo "Current Python and SQLite versions:"
-          python --version
-          python -c "import sqlite3; print(f\"SQLite version: {sqlite3.sqlite_version}\")"
-          python -c "import django; print(f\"Django version: {django.__version__}\")"
-
-          
-          # Upgrade pip and install requirements
+          # Install dependencies
           pip install --upgrade pip
-          pip install "urllib3<2.0"
           pip install -r requirements.txt
           
-          # Set the DJANGO_SETTINGS_MODULE environment variable
-          export DJANGO_SETTINGS_MODULE=api_project.settings
-
-          # Create staticfiles directory
-          mkdir -p api_project/staticfiles
+          # Create .env file
+          echo "DJANGO_SECRET_KEY='"'"'$DJANGO_SECRET_KEY'"'"'" > .env
+          echo "DEBUG=False" >> .env
+          echo "ALLOWED_HOSTS=${{ env.EC2_HOST }},localhost,127.0.0.1" >> .env
+          echo "DB_NAME='"'"'${{ env.DB_NAME }}'"'"'" >> .env
+          echo "DB_USER='"'"'${{ env.DB_USERNAME }}'"'"'" >> .env
+          echo "DB_PASSWORD='"'"'${{ env.DB_PASSWORD }}'"'"'" >> .env
+          echo "DB_HOST='"'"'${{ env.DB_ENDPOINT }}'"'"'" >> .env
+          echo "DB_PORT=${{ env.DB_PORT }}" >> .env
+          echo "CELERY_BROKER_URL='"'"'$CELERY_BROKER_URL'"'"'" >> .env
           
-          # Run Django commands with verbose output
-          cd api_project
-          python manage.py collectstatic --noinput -v 2
-          python manage.py makemigrations -v 2
-          python manage.py migrate -v 2
+          # Run Django commands
+          python manage.py collectstatic --noinput
+          python manage.py migrate
           
           # Restart the uvicorn service
           sudo systemctl restart uvicorn.service
-          
-          echo "Deployment completed successfully"
-        ' || { echo "Deployment failed"; exit 1; }
+        '
