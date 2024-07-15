@@ -92,7 +92,7 @@ jobs:
           export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
 
           # Ensure the correct PostgreSQL client is being used
-          export PATH=/usr/pgsql-14/bin:$PATH
+          #export PATH=/usr/pgsql-14/bin:$PATH
           which psql
           psql --version
 
