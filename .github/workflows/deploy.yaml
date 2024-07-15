@@ -48,53 +48,13 @@ jobs:
       run: |
         scp -r ./* ec2-user@${{ env.EC2_HOST }}:/home/ec2-user/app
         ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=30 ec2-user@${{ env.EC2_HOST }} '
-          set -e
-          cd /home/ec2-user/app
-          
-          echo "Step 1: Setting up Python environment"
-          sudo amazon-linux-extras enable python3.8
-          sudo yum install -y python3.8
-          /usr/bin/python3.8 -m venv venv
-          source venv/bin/activate
-          
-          echo "Step 2: Installing dependencies"
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          
-          echo "Step 3: Setting up environment variables"
-          echo "DJANGO_SECRET_KEY='"'"''"${DJANGO_SECRET_KEY}"'"'"'" > .env
-          echo "DEBUG=False" >> .env
-          echo "ALLOWED_HOSTS=${EC2_HOST},localhost,127.0.0.1" >> .env
-          echo "DB_NAME='"'"''"${DB_NAME}"'"'"'" >> .env
-          echo "DB_USER='"'"''"${DB_USERNAME}"'"'"'" >> .env
-          echo "DB_PASSWORD='"'"''"${DB_PASSWORD}"'"'"'" >> .env
-          echo "DB_HOST='"'"''"${DB_ENDPOINT}"'"'"'" >> .env
-          echo "DB_PORT=${DB_PORT}" >> .env
-          echo "CELERY_BROKER_URL='"'"''"${CELERY_BROKER_URL}"'"'"'" >> .env
-          
-          echo "Step 4: Setting PYTHONPATH"
-          export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
-          
-          echo "Step 5: Checking PostgreSQL client"
-          which psql
-          psql --version
-          
-          echo "Step 6: Testing database connection"
-          if ! PGPASSWORD='"'"''"${DB_PASSWORD}"'"'"' psql -h '"'"''"${DB_ENDPOINT}"'"'"' -U '"'"''"${DB_USERNAME}"'"'"' -d '"'"''"${DB_NAME}"'"'"' -c "SELECT 1;"; then
-            echo "Database connection failed"
-            exit 1
-          fi
-          
-          echo "Step 7: Ensuring database exists"
-          PGPASSWORD='"'"''"${DB_PASSWORD}"'"'"' psql -h '"'"''"${DB_ENDPOINT}"'"'"' -U '"'"''"${DB_USERNAME}"'"'"' -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '"'"''"${DB_NAME}"'"'"'" | grep -q 1 || PGPASSWORD='"'"''"${DB_PASSWORD}"'"'"' psql -h '"'"''"${DB_ENDPOINT}"'"'"' -U '"'"''"${DB_USERNAME}"'"'"' -d postgres -c "CREATE DATABASE ${DB_NAME}"
-          
-          echo "Step 8: Running Django commands"
-          cd api_project
-          python manage.py collectstatic --noinput
-          python manage.py migrate
-          
-          echo "Step 9: Restarting uvicorn service"
-          sudo systemctl restart uvicorn.service
-          
-          echo "Deployment completed successfully"
+          export DJANGO_SECRET_KEY="${{ env.DJANGO_SECRET_KEY }}"
+          export CELERY_BROKER_URL="${{ env.CELERY_BROKER_URL }}"
+          export EC2_HOST="${{ env.EC2_HOST }}"
+          export DB_NAME="${{ env.DB_NAME }}"
+          export DB_USERNAME="${{ env.DB_USERNAME }}"
+          export DB_PASSWORD="${{ env.DB_PASSWORD }}"
+          export DB_ENDPOINT="${{ env.DB_ENDPOINT }}"
+          export DB_PORT="${{ env.DB_PORT }}"
+          bash /home/ec2-user/app/deploy_script.sh
         '
