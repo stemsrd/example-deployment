@@ -120,27 +120,6 @@ jobs:
           echo "Hostname: $(hostname)"
           psql --version
 
-          # Debug environment variables
-          echo "Hostname: $(hostname)"
-          echo "DB_ENDPOINT: ${{ env.DB_ENDPOINT }}"
-          echo "Hostname: $(hostname)"
-          echo "DB_PORT: ${{ env.DB_PORT }}"
-          echo "Hostname: $(hostname)"
-          echo "DB_NAME: ${{ env.DB_NAME }}"
-          echo "Hostname: $(hostname)"
-          echo "DB_USERNAME: ${{ env.DB_USERNAME }}"
-          echo "Hostname: $(hostname)"
-          echo "DB_PASSWORD: ***" # Don't print the actual password
-
-          # Debug information
-          echo "Hostname: $(hostname)"
-          echo "Current directory: $(pwd)"
-          echo "Hostname: $(hostname)"
-          echo "Python version: $(python --version)"
-          echo "Pip version: $(pip --version)"
-          echo "Hostname: $(hostname)"
-          echo "PostgreSQL client version: $(psql --version)"
-          
           echo "Hostname: $(hostname)"
           echo "Testing database connection ..."
           PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d ${{ env.DB_NAME }} -c "SELECT 1;"
