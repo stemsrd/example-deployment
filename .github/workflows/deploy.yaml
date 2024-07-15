@@ -63,16 +63,16 @@ jobs:
           
           echo "Step 3: Setting up environment variables"
           cat > .env << EOT
-DJANGO_SECRET_KEY='$DJANGO_SECRET_KEY'
-DEBUG=False
-ALLOWED_HOSTS=$EC2_HOST,localhost,127.0.0.1
-DB_NAME='$DB_NAME'
-DB_USER='$DB_USERNAME'
-DB_PASSWORD='$DB_PASSWORD'
-DB_HOST='$DB_ENDPOINT'
-DB_PORT=$DB_PORT
-CELERY_BROKER_URL='$CELERY_BROKER_URL'
-EOT
+          DJANGO_SECRET_KEY='$DJANGO_SECRET_KEY'
+          DEBUG=False
+          ALLOWED_HOSTS=$EC2_HOST,localhost,127.0.0.1
+          DB_NAME='$DB_NAME'
+          DB_USER='$DB_USERNAME'
+          DB_PASSWORD='$DB_PASSWORD'
+          DB_HOST='$DB_ENDPOINT'
+          DB_PORT=$DB_PORT
+          CELERY_BROKER_URL='$CELERY_BROKER_URL'
+          EOT
           
           echo "Step 4: Setting PYTHONPATH"
           export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
@@ -99,4 +99,4 @@ EOT
           sudo systemctl restart uvicorn.service
           
           echo "Deployment completed successfully"
-EOF
+          EOF
