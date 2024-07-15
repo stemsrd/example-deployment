@@ -62,12 +62,15 @@ jobs:
           /usr/bin/python3.8 -m venv venv
           source venv/bin/activate
           
+          sleep 2
           echo "Python version in virtual environment:"
           python --version
 
           # Install dependencies
           pip install --upgrade pip
           pip install -r requirements.txt
+          pip install psycopg2-binary  # PostgreSQL adapter for Python
+
           
           # Create .env file
           echo "DJANGO_SECRET_KEY='"'"'$DJANGO_SECRET_KEY'"'"'" > .env
