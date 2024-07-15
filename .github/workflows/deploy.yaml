@@ -44,6 +44,14 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ env.EC2_HOST }} >> ~/.ssh/known_hosts
 
+    - name: Debug Environment Variables
+      run: |
+        echo "DB_ENDPOINT: ${{ env.DB_ENDPOINT }}"
+        echo "DB_PORT: ${{ env.DB_PORT }}"
+        echo "DB_NAME: ${{ env.DB_NAME }}"
+        echo "DB_USERNAME: ${{ env.DB_USERNAME }}"
+        echo "DB_PASSWORD: ***" # Don't print the actual password
+        
     - name: Deploy to EC2
       env:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
@@ -87,6 +95,22 @@ jobs:
           export PATH=/usr/pgsql-14/bin:$PATH
           which psql
           psql --version
+
+          # Debug environment variables
+          echo "DB_ENDPOINT: ${{ env.DB_ENDPOINT }}"
+          echo "DB_PORT: ${{ env.DB_PORT }}"
+          echo "DB_NAME: ${{ env.DB_NAME }}"
+          echo "DB_USERNAME: ${{ env.DB_USERNAME }}"
+          echo "DB_PASSWORD: ***" # Don't print the actual password
+
+          # Debug information
+          echo "Current directory: $(pwd)"
+          echo "Python version: $(python --version)"
+          echo "Pip version: $(pip --version)"
+          echo "PostgreSQL client version: $(psql --version)"
+          
+          echo "Testing database connection ..."
+          PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d ${{ env.DB_NAME }} -c "SELECT 1;"
 
           # Create database if it doesn't exist
           PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${{ env.DB_NAME }}'" | grep -q 1 || PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
