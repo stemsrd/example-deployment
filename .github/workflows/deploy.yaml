@@ -125,13 +125,18 @@ jobs:
           PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d ${{ env.DB_NAME }} -c "SELECT 1;"
 
           # Create database if it doesn't exist
+          echo "Hostname: $(hostname)"
           PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '${{ env.DB_NAME }}'" | grep -q 1 || PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d postgres -c "CREATE DATABASE ${{ env.DB_NAME }}"
 
           # Run Django commands
+          echo "Hostname: $(hostname)"
           cd api_project
+          echo "Hostname: $(hostname)"
           python manage.py collectstatic --noinput
+          echo "Hostname: $(hostname)"
           python manage.py migrate
           
           # Restart the uvicorn service
+          echo "Hostname: $(hostname)"
           sudo systemctl restart uvicorn.service
         '
