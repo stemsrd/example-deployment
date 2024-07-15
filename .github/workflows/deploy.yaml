@@ -57,61 +57,91 @@ jobs:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
       run: |
+        echo "Hostname: $(hostname)"
         scp -r ./* ec2-user@${{ env.EC2_HOST }}:/home/ec2-user/app
+        echo "Hostname: $(hostname)"
         ssh ec2-user@${{ env.EC2_HOST }} '
+          echo "Hostname: $(hostname)"
           set -e
+          echo "Hostname: $(hostname)"
           cd /home/ec2-user/app
-          hostname
           
           # Update Python to 3.8
+          echo "Hostname: $(hostname)"
           sudo amazon-linux-extras enable python3.8
+          echo "Hostname: $(hostname)"
           sudo yum install -y python3.8
 
           # Create and activate virtual environment using Python 3.8 explicitly
+          echo "Hostname: $(hostname)"
           /usr/bin/python3.8 -m venv venv
+          echo "Hostname: $(hostname)"
           source venv/bin/activate
           
+          echo "Hostname: $(hostname)"
           echo "Python version in virtual environment:"
+          echo "Hostname: $(hostname)"
           python --version
 
           # Install dependencies
+          echo "Hostname: $(hostname)"
           pip install --upgrade pip
+          echo "Hostname: $(hostname)"
           pip install -r requirements.txt
           
           # Create .env file
+          echo "Hostname: $(hostname)"
           echo "DJANGO_SECRET_KEY='"'"'$DJANGO_SECRET_KEY'"'"'" > .env
+          echo "Hostname: $(hostname)"
           echo "DEBUG=False" >> .env
+          echo "Hostname: $(hostname)"
           echo "ALLOWED_HOSTS=${{ env.EC2_HOST }},localhost,127.0.0.1" >> .env
+          echo "Hostname: $(hostname)"
           echo "DB_NAME='"'"'${{ env.DB_NAME }}'"'"'" >> .env
+          echo "Hostname: $(hostname)"
           echo "DB_USER='"'"'${{ env.DB_USERNAME }}'"'"'" >> .env
+          echo "Hostname: $(hostname)"
           echo "DB_PASSWORD='"'"'${{ env.DB_PASSWORD }}'"'"'" >> .env
+          echo "Hostname: $(hostname)"
           echo "DB_HOST='"'"'${{ env.DB_ENDPOINT }}'"'"'" >> .env
+          echo "Hostname: $(hostname)"
           echo "DB_PORT=${{ env.DB_PORT }}" >> .env
+          echo "Hostname: $(hostname)"
           echo "CELERY_BROKER_URL='"'"'$CELERY_BROKER_URL'"'"'" >> .env
           
           # Set PYTHONPATH
+          echo "Hostname: $(hostname)"
           export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
 
           # Ensure the correct PostgreSQL client is being used
           #export PATH=/usr/pgsql-14/bin:$PATH
+          echo "Hostname: $(hostname)"
           which psql
+          echo "Hostname: $(hostname)"
           psql --version
 
           # Debug environment variables
+          echo "Hostname: $(hostname)"
           echo "DB_ENDPOINT: ${{ env.DB_ENDPOINT }}"
+          echo "Hostname: $(hostname)"
           echo "DB_PORT: ${{ env.DB_PORT }}"
+          echo "Hostname: $(hostname)"
           echo "DB_NAME: ${{ env.DB_NAME }}"
+          echo "Hostname: $(hostname)"
           echo "DB_USERNAME: ${{ env.DB_USERNAME }}"
+          echo "Hostname: $(hostname)"
           echo "DB_PASSWORD: ***" # Don't print the actual password
 
           # Debug information
+          echo "Hostname: $(hostname)"
           echo "Current directory: $(pwd)"
+          echo "Hostname: $(hostname)"
           echo "Python version: $(python --version)"
           echo "Pip version: $(pip --version)"
+          echo "Hostname: $(hostname)"
           echo "PostgreSQL client version: $(psql --version)"
           
-          hostname
-          echo $(hostname)
+          echo "Hostname: $(hostname)"
           echo "Testing database connection ..."
           PGPASSWORD=${{ env.DB_PASSWORD }} psql -h ${{ env.DB_ENDPOINT }} -U ${{ env.DB_USERNAME }} -d ${{ env.DB_NAME }} -c "SELECT 1;"
 
