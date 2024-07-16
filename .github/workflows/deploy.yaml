@@ -46,15 +46,25 @@ jobs:
         DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
         CELERY_BROKER_URL: ${{ secrets.CELERY_BROKER_URL }}
       run: |
-        scp -r ./* ec2-user@${{ env.EC2_HOST }}:/home/ec2-user/app
+        # Create .env file
+        cat << EOF > .env
+        DJANGO_SECRET_KEY='${{ env.DJANGO_SECRET_KEY }}'
+        DEBUG=False
+        ALLOWED_HOSTS=${{ env.EC2_HOST }},localhost,127.0.0.1
+        DB_NAME='${{ env.DB_NAME }}'
+        DB_USER='${{ env.DB_USERNAME }}'
+        DB_PASSWORD='${{ env.DB_PASSWORD }}'
+        DB_HOST='${{ env.DB_ENDPOINT }}'
+        DB_PORT=${{ env.DB_PORT }}
+        CELERY_BROKER_URL='${{ env.CELERY_BROKER_URL }}'
+        EOF
+
+        # Copy files to EC2
+        scp -r ./* .env ec2-user@${{ env.EC2_HOST }}:/home/ec2-user/app
+
+        # Run deployment script
         ssh -o ServerAliveInterval=60 -o ServerAliveCountMax=30 ec2-user@${{ env.EC2_HOST }} '
-          export DJANGO_SECRET_KEY="${{ env.DJANGO_SECRET_KEY }}"
-          export CELERY_BROKER_URL="${{ env.CELERY_BROKER_URL }}"
-          export EC2_HOST="${{ env.EC2_HOST }}"
-          export DB_NAME="${{ env.DB_NAME }}"
-          export DB_USERNAME="${{ env.DB_USERNAME }}"
-          export DB_PASSWORD="${{ env.DB_PASSWORD }}"
-          export DB_ENDPOINT="${{ env.DB_ENDPOINT }}"
-          export DB_PORT="${{ env.DB_PORT }}"
-          bash /home/ec2-user/app/deploy_script.sh
+          cd /home/ec2-user/app
+          source .env
+          bash deploy_script.sh
         '
