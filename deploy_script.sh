@@ -14,7 +14,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 echo "Step 3: Setting up environment variables"
-# The .env file will be created by the GitHub Actions workflow
+# The .env file should already be sourced
 
 echo "Step 4: Setting PYTHONPATH"
 export PYTHONPATH=$PYTHONPATH:/home/ec2-user/app
@@ -24,13 +24,14 @@ which psql
 psql --version
 
 echo "Step 6: Testing database connection"
-if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_ENDPOINT" -U "$DB_USERNAME" -d "$DB_NAME" -c "SELECT 1;"; then
+echo "Attempting to connect to $DB_HOST:$DB_PORT"
+if ! PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" -c "SELECT 1;"; then
   echo "Database connection failed"
   exit 1
 fi
 
 echo "Step 7: Ensuring database exists"
-PGPASSWORD="$DB_PASSWORD" psql -h "$DB_ENDPOINT" -U "$DB_USERNAME" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || PGPASSWORD="$DB_PASSWORD" psql -h "$DB_ENDPOINT" -U "$DB_USERNAME" -d postgres -c "CREATE DATABASE $DB_NAME"
+PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1 || PGPASSWORD="$DB_PASSWORD" psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d postgres -c "CREATE DATABASE $DB_NAME"
 
 echo "Step 8: Running Django commands"
 cd api_project
